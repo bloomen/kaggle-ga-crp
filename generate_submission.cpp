@@ -21,16 +21,16 @@ int main()
     while (ifile >> line) {
         const auto pos = line.find(',');
         auto key = line.substr(0, pos);
-        const auto value = std::stof(line.substr(pos + 1));
+        const auto value = stof(line.substr(pos + 1));
         data.emplace_back(move(key), value);
     }
     ifile.close();
     cout << "Pairs read: " << data.size() << endl;
 
-    std::sort(data.begin(), data.end(),
-              [](const auto& x, const auto& y) {
-                  return x.first < y.first;
-              });
+    sort(data.begin(), data.end(),
+         [](const auto& x, const auto& y) {
+             return x.first < y.first;
+         });
 
     cout << "Sorted" << endl;
 
