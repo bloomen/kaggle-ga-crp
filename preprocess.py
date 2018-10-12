@@ -97,7 +97,6 @@ def drop_useless_columns(df):
         'sessionId',  # do we need to identify unique sessions?
         'visitId',  # do we need to identify unique visits?
         'visitStartTime',  # does it matter when the visit started?
-#        'trafficSource_referralPath',  # too many messy strings
     ]
 
     for col in useless_cols:
@@ -230,6 +229,10 @@ def clean_data(df):
         'Macintosh': 15,
         'Windows':  16,
         'Linux': 17,
+        'Tizen': 5,
+        'SymbianOS': 5,
+        'Playstation Vita': 6,
+        'OS/2': 17,
     }
     df[key] = df[key].apply(
         lambda x: translator[x])
@@ -246,7 +249,7 @@ def clean_data(df):
 
     key = 'geoNetwork_country'
     logger.info(key)
-    gdp = pd.read_csv('gdp_per_capita_2017.csv')
+    gdp = pd.read_csv('gdp_per_capita_2017.dat')
     translator = dict(zip(gdp['country'], gdp['gdp_per_capita']))
     translator[NOT_SET] = 17000
     df[key] = df[key].apply(

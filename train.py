@@ -1,9 +1,9 @@
 import utils
 import logging
 import preprocess
+import postprocess
 import pylab
 from sklearn.preprocessing.data import StandardScaler
-from sklearn.linear_model.base import LinearRegression
 import pandas as pd
 import numpy as np
 from sklearn.metrics.regression import mean_squared_error
@@ -31,7 +31,7 @@ def debug_info(df):
 
 
 def make_log_revenue(visitor_id, revenue):
-    # TODO: do this in C++ later
+    # TODO: do this in C++
     logger.info('making log revenue')
     df = pd.DataFrame()
     df['fullVisitorId'] = visitor_id
@@ -49,8 +49,8 @@ def make_log_revenue(visitor_id, revenue):
     return df
 
 
-def build_model(n_features):
-    np.random.seed(42)
+def build_regressor(n_features):
+#    np.random.seed(42)
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(64, activation=tf.nn.relu, input_shape=(n_features,)),
         tf.keras.layers.Dense(64, activation=tf.nn.relu),
@@ -61,7 +61,27 @@ def build_model(n_features):
     return model
 
 
-def save_model(model, i, scaler):
+def build_classifier(n_features, n_classes):
+#    np.random.seed(42)
+    model = tf.keras.Sequential([
+        tf.keras.layers.Dense(64, activation=tf.nn.relu, input_shape=(n_features,)),
+        tf.keras.layers.Dense(64, activation=tf.nn.relu),
+        tf.keras.layers.Dense(n_classes, activation=tf.nn.softmax)
+    ])
+
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=0.001),
+                  loss='sparse_categorical_crossentropy')
+    return model
+
+
+def hist_revenue(y, y_max, name=None):
+    pylab.figure(name)
+    pylab.hist(y, bins=20, range=[0, y_max])
+    pylab.yscale('log')
+    pylab.ylim([0.5, 1e7])
+
+
+def save_model(model, i, y_max, scaler):
     dir_name = 'model'
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
@@ -70,6 +90,7 @@ def save_model(model, i, scaler):
     tf.keras.models.save_model(model, filename)
     metadata = {
         'model_path': filename,
+        'y_max': y_max,
         'scaler': scaler,
     }
     filename_meta = os.path.join(dir_name, 'training_%04d.pickle' % i)
@@ -81,49 +102,55 @@ def save_model(model, i, scaler):
 def main():
     df = load_train_data()
     df = preprocess.drop_column(df, 'fullVisitorId')
-
     y = df['totals_transactionRevenue']
     X = preprocess.drop_column(df, 'totals_transactionRevenue')
-    X_train, X_test, y_train, y_test = utils.split_data(X, y, seed=42)
 
-    logger.info('training')
-    logger.info('X_train.shape = %s', X_train.shape)
+###    n_classes = 10
+    n_models = 50
 
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
+    y_max = y.max()
 
-    model = build_model(X_train.shape[1])
-    EPOCHS = 100
-    early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=20)
-    model.fit(X_train, y_train, epochs=EPOCHS,
-              validation_split=0.2, verbose=0,
-              callbacks=[early_stop, utils.EpochCallback()])
+    for i in range(n_models):
 
-    logger.info('predicting')
-    logger.info('X_test.shape = %s', X_test.shape)
+        X_train, X_test, y_train, y_test = utils.split_data(X, y)
 
-    X_test = scaler.transform(X_test)
-    y_pred = model.predict(X_test).flatten()
+###        y_train = preprocess.make_class_target(y_train, y_max, n_classes)
 
-    y_pred = np.clip(y_pred, 0, 100)
+        logger.info('training')
+        logger.info('X_train.shape = %s', X_train.shape)
 
-    rms = np.sqrt(mean_squared_error(y_test, y_pred))
-    logger.info('rms = %s', rms)
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
 
-    save_model(model, 0, scaler)
+        model = build_regressor(X_train.shape[1])
+        EPOCHS = 100
+        early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=20)
+        model.fit(X_train, y_train, epochs=EPOCHS,
+                  validation_split=0.2, verbose=0,
+                  callbacks=[early_stop, utils.EpochCallback()])
+
+        logger.info('predicting')
+        logger.info('X_test.shape = %s', X_test.shape)
+
+        X_test = scaler.transform(X_test)
+
+###         y_classes = model.predict(X_test)
+###         y_pred = postprocess.make_real_predictions(y_classes, y_max)
+
+        y_pred = model.predict(X_test).flatten()
+
+        rms = np.sqrt(mean_squared_error(y_test, y_pred))
+        logger.info('rms = %s', rms)
+
+        save_model(model, i, y_max, scaler)
 
     pylab.figure()
     pylab.scatter(y_pred, y_test, alpha=0.5)
     pylab.xlabel("pred")
     pylab.ylabel("test")
 
-    pylab.figure('pred')
-    pylab.hist(y_pred)
-    pylab.yscale('log')
-
-    pylab.figure('test')
-    pylab.hist(y_test)
-    pylab.yscale('log')
+    hist_revenue(y_pred, y_max, 'y_pred')
+    hist_revenue(y_test, y_max, 'y_test')
 
     pylab.show()
 
