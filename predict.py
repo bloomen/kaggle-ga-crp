@@ -42,6 +42,13 @@ def save_prediction(visitor_id, y_pred):
     df.to_csv('prediction.csv', index=False)
 
 
+def hist_revenue(y, y_max, name=None):
+    pylab.figure(name)
+    pylab.hist(y, bins=20, range=[0, y_max])
+    pylab.yscale('log')
+    pylab.ylim([0.5, 1e7])
+
+
 def main():
     df = load_predict_data()
 
@@ -63,13 +70,16 @@ def main():
         if y_pred is None:
             y_pred = model.predict(X).flatten()
         else:
-            y_pred = np.add(y_pred, model.predict(X))
+            y_pred = np.add(y_pred, model.predict(X).flatten())
 
     y_pred /= len(trainings)
     y_pred = np.clip(y_pred, 0, 100)
 
     logger.info('y_pred.shape = %s', y_pred.shape)
     save_prediction(visitor_id, y_pred)
+
+    hist_revenue(y_pred, y_pred.max())
+    pylab.show()
 
 
 if __name__ == '__main__':

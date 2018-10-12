@@ -52,11 +52,11 @@ def make_log_revenue(visitor_id, revenue):
 def build_regressor(n_features):
 #    np.random.seed(42)
     model = tf.keras.Sequential([
-        tf.keras.layers.Dense(64, activation=tf.nn.relu, input_shape=(n_features,)),
-        tf.keras.layers.Dense(64, activation=tf.nn.relu),
+        tf.keras.layers.Dense(2*n_features, activation=tf.nn.relu, input_shape=(n_features,)),
+        tf.keras.layers.Dense(n_features, activation=tf.nn.relu),
         tf.keras.layers.Dense(1)
     ])
-    optimizer = tf.keras.optimizers.Adam(lr=0.001)
+    optimizer = tf.keras.optimizers.RMSprop()
     model.compile(optimizer=optimizer, loss='mse')
     return model
 
