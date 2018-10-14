@@ -22,6 +22,16 @@ def split_data(X, y, ratio=0.2, seed=0):
 
 
 class EpochCallback(tf.keras.callbacks.Callback):
-    def on_epoch_end(self, epoch, _):
-        if epoch % 10 == 0:
-            logger.info("epoch = %d", epoch)
+    def on_epoch_end(self, epoch, log):
+        logger.info("epoch = %d / val_loss = %f", epoch, log['val_loss'])
+
+
+def column_hash(df):
+    col_names = '-'.join(df.columns)
+    total = 0
+    for i, c in enumerate(col_names):
+        if i % 2 == 0:
+            total += ord(c)
+        else:
+            total -= ord(c)
+    return total
