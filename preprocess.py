@@ -141,6 +141,14 @@ def drop_useless_columns(df):
         'geoNetwork_subContinent',  # use gdp instead
         'device_operatingSystem',  # don't expect to matter
         'date',  # use visitStartTime instead
+        'trafficSource_campaign',
+        'trafficSource_keyword',
+        'trafficSource_source',
+        'trafficSource_isTrueDirect',
+        'trafficSource_adContent',
+        'trafficSource_referralPath',
+        'device_browser',
+        'device_isMobile',
     ]
 
     for col in useless_cols:
@@ -216,6 +224,47 @@ def generate_timezones(df):
     return timezone_city, timezone_country
 
 
+def add_lag(df, lag):
+    logger.info('adding lag: %d', lag)
+    cols_to_lag = [
+        'totals_bounces',
+        'totals_hits',
+        'totals_newVisits',
+        'totals_pageviews',
+        'totals_transactionRevenue',
+        'visitNumber',
+    ]
+
+    df = df.sort_values(['fullVisitorId', 'visitStartTime'])
+
+    new_cols = OrderedDict()
+
+    gb = df.groupby('fullVisitorId')
+    logger.info('groupby size = %d', len(gb))
+
+    for _, x in gb:
+        for col in cols_to_lag:
+            for i in range(1, lag + 1):
+                key = col + '_lag%d' % i
+                if x.shape[0] > i:
+                    data = list(x[col].shift(i))
+                    for j in range(i):
+                        data[j] = x[col].iloc[0]
+                else:
+                    data = list(x[col])
+                if key in new_cols:
+                    new_cols[key].extend(data)
+                else:
+                    new_cols[key] = data
+
+    for key, val in new_cols.items():
+        df[key] = val
+
+    df = drop_column(df, 'visitStartTime')
+    logger.info('df.shape: %s', df.shape)
+    return df
+
+
 def clean_data(df, timezone_city, timezone_country):
     logger.info('cleaning data')
 
@@ -260,7 +309,6 @@ def clean_data(df, timezone_city, timezone_country):
         i += 1
 
     df = drop_column(df, 'geoNetwork_city')
-    df = drop_column(df, key)
     df[key + '_morning'] = morning
     df[key + '_lunchtime'] = lunchtime
     df[key + '_daytime'] = daytime
@@ -285,35 +333,6 @@ def clean_data(df, timezone_city, timezone_country):
     ]
     df = one_hot_encode(df, key, names)
 
-    key = 'trafficSource_campaign'
-    logger.info(key)
-    df[key] = df[key].apply(
-        lambda x: 1 if x != NOT_SET else 0)
-
-    key = 'trafficSource_keyword'
-    logger.info(key)
-    def keyword_index(x):
-        if x == NOT_SET:
-            return 0
-        elif x == '(not provided)':
-            return 0
-        else:
-            return 1
-    df[key] = df[key].apply(
-        lambda x: keyword_index(x))
-
-    key = 'trafficSource_source'
-    logger.info(key)
-    def source_index(x):
-        if x == NOT_SET:
-            return 0
-        elif x == '(direct)':
-            return 2
-        else:
-            return 1
-    df[key] = df[key].apply(
-        lambda x: source_index(x))
-
     key = 'trafficSource_medium'
     logger.info(key)
     names = [
@@ -326,67 +345,6 @@ def clean_data(df, timezone_city, timezone_country):
     ]
     df[key] = df[key].apply(lambda x: NOT_SET if x == '(none)' else x)
     df = one_hot_encode(df, key, names)
-
-    key = 'trafficSource_isTrueDirect'
-    logger.info(key)
-    df[key] = df[key].apply(
-        lambda x: 1 if x else 0)
-
-    key = 'trafficSource_adContent'
-    logger.info(key)
-    df[key] = df[key].apply(
-        lambda x: 1 if x != NOT_SET else 0)
-
-    key = 'trafficSource_referralPath'
-    logger.info(key)
-    def referralPath_index(x):
-        if x == NOT_SET:
-            return 0
-        else:
-            return 1
-    df[key] = df[key].apply(
-        lambda x: referralPath_index(x))
-
-    key = 'device_browser'
-    logger.info(key)
-    main_stream = ['Chrome', 'Firefox', 'Internet Explorer', 'Safari', 'Edge',
-                   'IE', 'Android', 'Mozilla', 'Blackberry']
-    df[key] = df[key].apply(lambda x: 1 if x in main_stream else 0)
-
-    key = 'device_isMobile'
-    logger.info(key)
-    df[key] = df[key].apply(
-        lambda x: 1 if x else 0)
-
-#     key = 'device_operatingSystem'
-#     logger.info(key)
-#     names = [
-#         NOT_SET,
-#         'Android',
-#         'iOS',
-#         'Chrome OS',
-#         'Windows Phone',
-#         'Samsung',
-#         'Xbox',
-#         'Nintendo WiiU',
-#         'Nintendo Wii',
-#         'BlackBerry',
-#         'Firefox OS',
-#         'FreeBSD',
-#         'OpenBSD',
-#         'Nintendo 3DS',
-#         'Nokia',
-#         'NTT DoCoMo',
-#         'SunOS',
-#         'Macintosh',
-#         'Windows',
-#         'Linux',
-#         'Tizen',
-#         'SymbianOS',
-#         'Playstation Vita',
-#         'OS/2',
-#     ]
-#     df = one_hot_encode(df, key, names)
 
     key = 'device_deviceCategory'
     logger.info(key)
@@ -404,47 +362,6 @@ def clean_data(df, timezone_city, timezone_country):
     translator[NOT_SET] = 17000
     df[key] = df[key].apply(
         lambda x: translator[x])
-
-#     key = 'geoNetwork_continent'
-#     logger.info(key)
-#     names = [
-#         NOT_SET,
-#         'Asia',
-#         'Oceania',
-#         'Europe',
-#         'Americas',
-#         'Africa',
-#     ]
-#     df = one_hot_encode(df, key, names)
-#  
-#     key = 'geoNetwork_subContinent'
-#     logger.info(key)
-#     names = [
-#         NOT_SET,
-#         'Western Asia',
-#         'Australasia',
-#         'Southern Europe',
-#         'Southeast Asia',
-#         'Northern Europe',
-#         'Southern Asia',
-#         'Western Europe',
-#         'South America',
-#         'Eastern Asia',
-#         'Eastern Europe',
-#         'Northern America',
-#         'Western Africa',
-#         'Central America',
-#         'Eastern Africa',
-#         'Caribbean',
-#         'Southern Africa',
-#         'Northern Africa',
-#         'Central Asia',
-#         'Middle Africa',
-#         'Melanesia',
-#         'Micronesian Region',
-#         'Polynesia',
-#     ]
-#     df = one_hot_encode(df, key, names)
 
     key = 'totals_bounces'
     logger.info(key)
@@ -532,6 +449,7 @@ def load_data(data_type):
         df = drop_useless_columns(df)
         df = clean_data(df, timezone_city, timezone_country)
         df = groupby_session_id(df)
+        df = add_lag(df, 2)
         df['totals_transactionRevenue'] = df['totals_transactionRevenue'].apply(
             lambda x: np.log(float(x) + 1))
         with open(cache, 'wb') as f:

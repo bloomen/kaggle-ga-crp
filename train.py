@@ -125,7 +125,7 @@ def plot_history_regressor(history):
     pylab.plot(history.epoch, np.sqrt(np.array(history.history['val_loss'])),
                label='Validation')
     pylab.legend()
-    pylab.ylim([1, 5])
+    pylab.ylim([0, 3])
 
 
 def main():
@@ -141,7 +141,7 @@ def main():
 #    X, _, y, _ = utils.split_data(X, y, ratio=0.9, seed=42)
 
 #    n_classes = 10
-    n_models = 100
+    n_models = 1
 
     y_max = y.max()
 

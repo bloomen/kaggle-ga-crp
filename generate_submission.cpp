@@ -21,8 +21,8 @@ int main()
     while (ifile >> line) {
         const auto pos = line.find(',');
         auto key = line.substr(0, pos);
-        const auto value = stof(line.substr(pos + 1));
-        data.emplace_back(move(key), value);
+        const double value = stof(line.substr(pos + 1));
+        data.emplace_back(move(key), max(0.0, value));
     }
     ifile.close();
     cout << "Pairs read: " << data.size() << endl;
