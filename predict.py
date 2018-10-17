@@ -23,7 +23,7 @@ def load_trainings():
     logger.info('loading trainings')
     filenames = []
     for f in os.listdir('model'):
-        if f.startswith('training_0000'):
+        if f.startswith('training'):
             filenames.append(os.path.join('model', f))
     trainings = []
     for filename in filenames:

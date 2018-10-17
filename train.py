@@ -35,8 +35,8 @@ def debug_info(df):
 def build_regressor(n_features):
 #    np.random.seed(42)
     model = tf.keras.Sequential([
-        tf.keras.layers.Dense(2*n_features, activation=tf.nn.sigmoid, input_shape=(n_features,)),
-        tf.keras.layers.Dense(2*n_features, activation=tf.nn.sigmoid),
+        tf.keras.layers.Dense(2*n_features, activation=tf.nn.relu, input_shape=(n_features,)),
+        tf.keras.layers.Dense(2*n_features, activation=tf.nn.relu),
         tf.keras.layers.Dense(1)
     ])
     optimizer = tf.keras.optimizers.RMSprop()
@@ -141,7 +141,7 @@ def main():
 #    X, _, y, _ = utils.split_data(X, y, ratio=0.9, seed=42)
 
 #    n_classes = 10
-    n_models = 1
+    n_models = 100
 
     y_max = y.max()
 

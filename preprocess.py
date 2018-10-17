@@ -449,7 +449,7 @@ def load_data(data_type):
         df = drop_useless_columns(df)
         df = clean_data(df, timezone_city, timezone_country)
         df = groupby_session_id(df)
-        df = add_lag(df, 2)
+        df = add_lag(df, 5)
         df['totals_transactionRevenue'] = df['totals_transactionRevenue'].apply(
             lambda x: np.log(float(x) + 1))
         with open(cache, 'wb') as f:
