@@ -59,7 +59,8 @@ def debug_info(df):
     return
 
 
-def evaluate(model, X):
+def evaluate(visitor_id, model, X):
+    # this assumes X is sorted by visitor id
     logger.info('X.shape = %s', X.shape)
     lag_cols = []
     columns = list(X.columns)
@@ -73,14 +74,21 @@ def evaluate(model, X):
 
     y_pred = []
     y = None
+    vis = visitor_id[0]
+    same_vis_count = 0
     for k in range(X.shape[0]):
         if k % 100000 == 0:
             logger.info('row index: %d', k)
-        for i in range(1, min(len(lag_cols), len(y_pred)) + 1):
-            X.iloc[k, lag_cols[i-1]] = y_pred[k-i]
+        if vis == visitor_id[k]:  # only add lag for the same visitor
+            for i in range(1, min(len(lag_cols), same_vis_count) + 1):
+                X.iloc[k, lag_cols[i-1]] = y_pred[k-i]
+        else:
+            same_vis_count = 0
         X_tmp = np.array([X.values[k, :]])
         y = model.predict_on_batch(X_tmp).flatten()
         y_pred.append(y[0])
+        vis = visitor_id[k]
+        same_vis_count += 1
 
     return np.array(y_pred)
 
@@ -101,21 +109,24 @@ def main():
 
     y_pred = None
     for training in trainings:
-        logger.info('predicting with: ' + training['model_path'])
-        model = training['model']
-#        quants = training['quants']
-        scaler = training['scaler']
-        X = preprocess.drop_column(df, 'totals_transactionRevenue')
-        columns = X.columns
-        logger.info('X.shape = %s', X.shape)
-        X = scaler.transform(X)
-#         y_classes = model.predict(X)
-#         y_tmp = postprocess.make_real_predictions(y_classes, quants)
-        y_tmp = evaluate(model, pd.DataFrame(X, columns=columns))
-        if y_pred is None:
-            y_pred = y_tmp
-        else:
-            y_pred = np.add(y_pred, y_tmp)
+        try:
+            logger.info('predicting with: ' + training['model_path'])
+            model = training['model']
+    #        quants = training['quants']
+            scaler = training['scaler']
+            X = preprocess.drop_column(df, 'totals_transactionRevenue')
+            columns = X.columns
+            logger.info('X.shape = %s', X.shape)
+            X = scaler.transform(X)
+    #         y_classes = model.predict(X)
+    #         y_tmp = postprocess.make_real_predictions(y_classes, quants)
+            y_tmp = evaluate(visitor_id, model, pd.DataFrame(X, columns=columns))
+            if y_pred is None:
+                y_pred = y_tmp
+            else:
+                y_pred = np.add(y_pred, y_tmp)
+        except KeyboardInterrupt:
+            break
 
     y_pred /= len(trainings)
 
