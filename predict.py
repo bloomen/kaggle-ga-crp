@@ -59,6 +59,32 @@ def debug_info(df):
     return
 
 
+def evaluate(model, X):
+    logger.info('X.shape = %s', X.shape)
+    lag_cols = []
+    columns = list(X.columns)
+    for i in range(1, 100):
+        col = 'totals_transactionRevenue_lag%d' % i
+        if col in columns:
+            lag_cols.append(columns.index(col))
+        else:
+            break
+    logger.info('lag found: %d', len(lag_cols))
+
+    y_pred = []
+    y = None
+    for k in range(X.shape[0]):
+        if k % 100000 == 0:
+            logger.info('row index: %d', k)
+        for i in range(1, min(len(lag_cols), len(y_pred)) + 1):
+            X.iloc[k, lag_cols[i-1]] = y_pred[k-i]
+        X_tmp = np.array([X.values[k, :]])
+        y = model.predict_on_batch(X_tmp).flatten()
+        y_pred.append(y[0])
+
+    return np.array(y_pred)
+
+
 def main():
     df = load_predict_data()
     logger.info('column hash = %d', utils.column_hash(df))
@@ -80,11 +106,12 @@ def main():
 #        quants = training['quants']
         scaler = training['scaler']
         X = preprocess.drop_column(df, 'totals_transactionRevenue')
+        columns = X.columns
         logger.info('X.shape = %s', X.shape)
         X = scaler.transform(X)
 #         y_classes = model.predict(X)
 #         y_tmp = postprocess.make_real_predictions(y_classes, quants)
-        y_tmp = model.predict(X).flatten()
+        y_tmp = evaluate(model, pd.DataFrame(X, columns=columns))
         if y_pred is None:
             y_pred = y_tmp
         else:
