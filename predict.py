@@ -90,10 +90,10 @@ def main():
         else:
             y_pred = np.add(y_pred, y_tmp)
 
-    y_pred /= len(trainings)
+        y_pred /= len(trainings)
 
-    logger.info('y_pred.shape = %s', y_pred.shape)
-    save_prediction(visitor_id, y_pred)
+        logger.info('y_pred.shape = %s', y_pred.shape)
+        save_prediction(visitor_id, y_pred)
 
     hist_revenue(y_pred, y_pred.max())
     pylab.show()

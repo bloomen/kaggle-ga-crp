@@ -358,36 +358,6 @@ def clean_data(df, timezone_city, timezone_country):
     df[key] = df[key].apply(
         lambda x: 1 if x else 0)
 
-#     key = 'device_operatingSystem'
-#     logger.info(key)
-#     names = [
-#         NOT_SET,
-#         'Android',
-#         'iOS',
-#         'Chrome OS',
-#         'Windows Phone',
-#         'Samsung',
-#         'Xbox',
-#         'Nintendo WiiU',
-#         'Nintendo Wii',
-#         'BlackBerry',
-#         'Firefox OS',
-#         'FreeBSD',
-#         'OpenBSD',
-#         'Nintendo 3DS',
-#         'Nokia',
-#         'NTT DoCoMo',
-#         'SunOS',
-#         'Macintosh',
-#         'Windows',
-#         'Linux',
-#         'Tizen',
-#         'SymbianOS',
-#         'Playstation Vita',
-#         'OS/2',
-#     ]
-#     df = one_hot_encode(df, key, names)
-
     key = 'device_deviceCategory'
     logger.info(key)
     names = [
@@ -404,47 +374,6 @@ def clean_data(df, timezone_city, timezone_country):
     translator[NOT_SET] = 17000
     df[key] = df[key].apply(
         lambda x: translator[x])
-
-#     key = 'geoNetwork_continent'
-#     logger.info(key)
-#     names = [
-#         NOT_SET,
-#         'Asia',
-#         'Oceania',
-#         'Europe',
-#         'Americas',
-#         'Africa',
-#     ]
-#     df = one_hot_encode(df, key, names)
-#  
-#     key = 'geoNetwork_subContinent'
-#     logger.info(key)
-#     names = [
-#         NOT_SET,
-#         'Western Asia',
-#         'Australasia',
-#         'Southern Europe',
-#         'Southeast Asia',
-#         'Northern Europe',
-#         'Southern Asia',
-#         'Western Europe',
-#         'South America',
-#         'Eastern Asia',
-#         'Eastern Europe',
-#         'Northern America',
-#         'Western Africa',
-#         'Central America',
-#         'Eastern Africa',
-#         'Caribbean',
-#         'Southern Africa',
-#         'Northern Africa',
-#         'Central Asia',
-#         'Middle Africa',
-#         'Melanesia',
-#         'Micronesian Region',
-#         'Polynesia',
-#     ]
-#     df = one_hot_encode(df, key, names)
 
     key = 'totals_bounces'
     logger.info(key)
@@ -484,7 +413,7 @@ def reduce_group(group):
         if col.startswith('totals_') or col == 'visitNumber':
             reduced.append(column.sum())
         else:
-            reduced.append(column.iloc[0])
+            reduced.append(column.iloc[np.random.randint(0, column.shape[0])])
     return pd.Series(reduced, index=columns)
 
 
@@ -492,6 +421,17 @@ def groupby_session_id(df):
     logger.info('grouping by sessionId')
 
     gb = df.groupby('sessionId')
+    logger.info('groupby size = %d', len(gb))
+    df = gb.apply(reduce_group)
+
+    logger.info('df.shape: %s', df.shape)
+    return df
+
+
+def groupby_visitor_id(df):
+    logger.info('grouping by fullVisitorId')
+
+    gb = df.groupby('fullVisitorId')
     logger.info('groupby size = %d', len(gb))
     df = gb.apply(reduce_group)
 
@@ -531,7 +471,7 @@ def load_data(data_type):
         timezone_city, timezone_country = generate_timezones(df)
         df = drop_useless_columns(df)
         df = clean_data(df, timezone_city, timezone_country)
-        df = groupby_session_id(df)
+        df = groupby_visitor_id(df)
         df['totals_transactionRevenue'] = df['totals_transactionRevenue'].apply(
             lambda x: np.log(float(x) + 1))
         with open(cache, 'wb') as f:
