@@ -3,7 +3,8 @@ import logging
 import preprocess
 import postprocess
 import pylab
-from sklearn.preprocessing.data import StandardScaler
+from sklearn.preprocessing.data import StandardScaler, PolynomialFeatures,\
+    MinMaxScaler
 import pandas as pd
 import numpy as np
 from sklearn.metrics.regression import mean_squared_error
@@ -83,7 +84,7 @@ def save_model(model, i, quants, scaler):
         pickle.dump(metadata, f)
 
 
-def save_model2(model, linear_model, i, y_max, scaler):
+def save_model2(model, linear_model, i, y_max, poly, scaler):
     dir_name = 'model'
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
@@ -94,6 +95,7 @@ def save_model2(model, linear_model, i, y_max, scaler):
         'model_path': filename,
         'linear_model': linear_model,
         'y_max': y_max,
+        'poly': poly,
         'scaler': scaler,
     }
     filename_meta = os.path.join(dir_name, 'training_%04d.pickle' % i)
@@ -128,11 +130,29 @@ def plot_history_regressor(history):
     pylab.ylim([0, 3])
 
 
+def add_poly_features(poly, X, fit=False):
+    logger.info('adding polynomial features: fit=%s', fit)
+    poly_train_df = X[preprocess.poly_features(X)]
+    if fit:
+        poly_train = poly.fit_transform(poly_train_df.values)
+    else:
+        poly_train = poly.transform(poly_train_df.values)
+    poly_train = pd.DataFrame(poly_train,
+                              columns=poly.get_feature_names())
+    poly_train['sessionId'] = X.index
+    poly_train.set_index('sessionId')
+    X = X.merge(poly_train, on='sessionId', how='left')
+    X = preprocess.drop_column(X, 'sessionId')
+    logger.info('X.shape = %s', X.shape)
+    return X
+
+
 def main():
     df = load_train_data()
     logger.info('column hash = %d', utils.column_hash(df))
     df = preprocess.drop_column(df, 'fullVisitorId')
-    df = preprocess.drop_column(df, 'sessionId')
+    df = preprocess.drop_column(df, 'visitStartTime')
+#    df = preprocess.drop_column(df, 'sessionId')
 #    debug_info(df)
 
     y = df['totals_transactionRevenue']
@@ -141,7 +161,7 @@ def main():
 #    X, _, y, _ = utils.split_data(X, y, ratio=0.9, seed=42)
 
 #    n_classes = 10
-    n_models = 100
+    n_models = 1
 
     y_max = y.max()
 
@@ -157,8 +177,16 @@ def main():
 
 #        y_train = preprocess.make_class_target2(y_train, y_max, n_classes)
 
+        poly = PolynomialFeatures(degree=2)
+
+        X_train = add_poly_features(poly, X_train, fit=True)
+
         scaler = StandardScaler()
+#        scaler = MinMaxScaler(feature_range=(0, 1))
         X_train = scaler.fit_transform(X_train)
+
+        pca = PCA(n_components=30)
+        X_train = pca.fit_transform(X_train)
 
         logger.info('X_train.shape = %s', X_train.shape)
 
@@ -181,7 +209,14 @@ def main():
         logger.info('predicting')
         logger.info('X_test.shape = %s', X_test.shape)
 
+        poly_test = X_test[preprocess.poly_features(X_test)]
+        poly_test = pd.DataFrame(poly.transform(poly_test), columns=poly_test.columns)
+        X_test = pd.concat([X_test, poly_test], axis=1)
+
+        X_test = add_poly_features(poly, X_test)
+
         X_test = scaler.transform(X_test)
+        X_test = pca.transform(X_test)
 
 #        y_classes = model.predict(X_test)
 #        y_pred = postprocess.make_real_predictions(y_classes, quants)
@@ -196,7 +231,7 @@ def main():
         logger.info('linear_rms = %s', linear_rms)
 
 #        save_model(model, i, quants, scaler)
-        save_model2(model, linear_model, i, y_max, scaler)
+        save_model2(model, linear_model, i, y_max, poly, scaler)
 
 #    plot_history_classifier(history)
     plot_history_regressor(history)

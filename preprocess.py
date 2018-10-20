@@ -11,6 +11,7 @@ import requests
 import time
 from dateutil import tz
 import pytz
+from sklearn.preprocessing.data import PolynomialFeatures
 
 
 logger = logging.getLogger(__name__)
@@ -398,8 +399,10 @@ def reduce_group(group):
     for col in group:
         columns.append(col)
         column = group[col]
-        if col.startswith('totals_') or col == 'visitNumber':
+        if col == 'totals_transactionRevenue':
             reduced.append(column.sum())
+        elif col.startswith('totals_') or col == 'visitNumber':
+            reduced.append(column.iloc[-1])
         else:
             reduced.append(column.iloc[0])
     return pd.Series(reduced, index=columns)
@@ -423,7 +426,7 @@ def load_data(data_type):
         logger.info('reading cached data')
         with open(cache, 'rb') as f:
             df = pickle.load(f)
-        df = df.reindex_axis(sorted(df.columns), axis=1)
+        df = df.reindex(sorted(df.columns), axis=1)
         logger.info('df.shape = %s', df.shape)
         return df
     else:
@@ -448,12 +451,27 @@ def load_data(data_type):
         timezone_city, timezone_country = generate_timezones(df)
         df = drop_useless_columns(df)
         df = clean_data(df, timezone_city, timezone_country)
+        df = df.sort_values(['fullVisitorId', 'visitStartTime'])
         df = groupby_session_id(df)
-        df = add_lag(df, 5)
         df['totals_transactionRevenue'] = df['totals_transactionRevenue'].apply(
             lambda x: np.log(float(x) + 1))
         with open(cache, 'wb') as f:
             pickle.dump(df, f)
-        df = df.reindex_axis(sorted(df.columns), axis=1)
+        df = df.reindex(sorted(df.columns), axis=1)
         logger.info('df.shape = %s', df.shape)
         return df
+
+
+def poly_features(df):
+    features = []
+    for col in df:
+        if col.startswith('totals_'):
+            features.append(col)
+        elif col.startswith('device_deviceCategory'):
+            features.append(col)
+        elif col.startswith('trafficSource_medium'):
+            features.append(col)
+        elif col.startswith('channelGrouping'):
+            features.append(col)
+    features.append('geoNetwork_country')
+    return features
